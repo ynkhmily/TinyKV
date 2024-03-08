@@ -41,6 +41,49 @@ public class TinyKV implements KV{
 
     private Cleaner cleaner;
 
+    public static void main(String[] args) throws InterruptedException {
+        String filePath = "E:\\zyh\\java\\TinyKV\\data";
+        int maxNum = 100;
+        TinyKV tinyKV = new TinyKV(filePath, maxNum);
+        CountDownLatch countDownLatch = new CountDownLatch(2);
+
+        new Thread(new Runnable() {
+            @Override
+            public void run() {
+                for (int i = 0; i < 500; i++) {
+                    tinyKV.set(String.valueOf(i), "thread1 : " + i);
+                }
+                countDownLatch.countDown();
+
+            }
+        },"thread1").start();
+//
+        new Thread(new Runnable() {
+            @Override
+            public void run() {
+                for (int i = 0; i < 300; i++) {
+//                    tinyKV.set(String.valueOf(i), "thread2 : " + i);
+                    tinyKV.rm(String.valueOf(i));
+                }
+
+                countDownLatch.countDown();
+            }
+        },"thread2").start();
+
+
+        countDownLatch.countDown();
+        countDownLatch.await();
+
+//        for (int i = 0; i < 300; i++) {
+//            tinyKV.rm(String.valueOf(i));
+//        }
+
+        for (int i = 0; i < 500; i++) {
+            System.out.println(i + " : " + tinyKV.get(String.valueOf(i)));
+        }
+        System.out.println("finish");
+    }
+
     public TinyKV(String dataDir, int storeThreshold){
         this.dataDir = dataDir;
         this.log = new CommitLog(dataDir);
@@ -48,12 +91,7 @@ public class TinyKV implements KV{
         // core 1; max 1; keepAliveTime 60; 这里必须是单线程
         this.workerPool = new ThreadPoolExecutor(1,1, 5,
                 TimeUnit.SECONDS,new LinkedBlockingDeque<>(10),new DefaultThreadFactory("TinKV"));
-        if(CommitLog.containWAL(dataDir)){
-            this.memtable = this.log.recoverTableFromLog();
-            recoverTmpFileWrite();
-        } else {
-            this.memtable = new TreeMap<>();
-        }
+
         this.immutable = new ConcurrentLinkedDeque<>();
         this.lock = new ReentrantReadWriteLock();
         ManiFest maniFest = null;
@@ -62,6 +100,12 @@ public class TinyKV implements KV{
             this.tableTree = maniFest.rebuildTreeFromFile();
             cleaner = new Cleaner(maniFest, dataDir);
             cleaner.start();
+            if(CommitLog.containWAL(dataDir)){
+                this.memtable = this.log.recoverTableFromLog();
+                recoverTmpFileWrite();
+            } else {
+                this.memtable = new TreeMap<>();
+            }
         } catch (IOException e) {
             throw new RuntimeException("TinyKV启动失败");
         }

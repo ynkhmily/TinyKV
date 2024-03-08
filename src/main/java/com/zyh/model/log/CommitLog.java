@@ -178,7 +178,7 @@ public class CommitLog implements Closeable {
     public List<TreeMap<String, Element>> recoverTableFromTmpLog(){
         List<TreeMap<String, Element>>  data = new ArrayList<>();
         for (int i = 0; i < tmpNumList.size(); i++) {
-            int tmpNum = tmpNumList.pollFirst();
+            int tmpNum = tmpNumList.peekFirst();
             TreeMap<String, Element> current = new TreeMap<>();
             RandomAccessFile file = null;
             String filePath = formatFilePath(dataDir, WAL_TMP + tmpNum + SUFFIX);
